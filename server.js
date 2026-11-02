@@ -1,5 +1,5 @@
 'use strict';
-const { createApp } = require('./src/app');
+const { createApp } = require('./src/createApp');
 
 const PORT = process.env.PORT || 3000;
 createApp().listen(PORT, () => {
