@@ -6,7 +6,7 @@ const apiRouter = require('./routes/api');
 const registry = require('./plugins/registry');
 const { AppError } = require('./lib/errors');
 
-// rate limit sederhana per IP (tanpa dependency)
+// rate limit sederhana per IP (tanpa pakedependency)
 function rateLimit({ windowMs = 60000, max = Number(process.env.RATE_LIMIT || 120) } = {}) {
   const hits = new Map();
   setInterval(() => hits.clear(), windowMs).unref();
@@ -21,13 +21,13 @@ function rateLimit({ windowMs = 60000, max = Number(process.env.RATE_LIMIT || 12
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  if (process.env.VERCEL || process.env.TRUST_PROXY) app.set('trust proxy', 1);
   app.use(cors());
 
   app.get('/health', (req, res) =>
     res.json({ success: true, name: 'Komik Scraper API', version: require('../package.json').version, sites: registry.sites() }),
   );
 
-  // /api/image dipakai <img> untuk banyak gambar sekaligus, jadi tidak ikut rate limit
   const limiter = rateLimit();
   app.use('/api', (req, res, next) => (req.path === '/image' ? next() : limiter(req, res, next)));
   app.use('/api', apiRouter);
@@ -38,7 +38,6 @@ function createApp() {
   app.get('/reader', (req, res) => res.redirect('/'));
   app.use(express.static(path.join(__dirname, '..', 'public')));
 
-  // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     const known = err instanceof AppError;
     if (!known) console.error('[ERROR]', req.method, req.originalUrl, err.message);
