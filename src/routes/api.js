@@ -1,5 +1,12 @@
 'use strict';
-
+/**
+ * GET /api/sites
+ * GET /api/search?q=&site=&page=            (site kosong = cari di semua situs)
+ * GET /api/comics/:slug?site=
+ * GET /api/comics/:slug/chapters?site=
+ * GET /api/chapters/:chapterId/pages?site=
+ * GET /api/image?url=&site=                 (proxy gambar, melewati hotlink protection)
+ */
 const express = require('express');
 const axios = require('axios');
 const registry = require('../plugins/registry');
@@ -43,6 +50,7 @@ router.get('/image', async (req, res) => {
   let target = String(req.query.url || '');
   let site = req.query.site ? registry.getPlugin(req.query.site) : null;
 
+  // ikuti redirect manual (maks 3x) sambil memeriksa tiap tujuan agar tidak bisa diarahkan ke jaringan internal
   let upstream;
   for (let hop = 0; hop <= 3; hop++) {
     const u = await assertPublicUrl(target);

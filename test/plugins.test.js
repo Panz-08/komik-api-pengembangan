@@ -1,5 +1,6 @@
 'use strict';
-// Untuk Tess parsing
+// Tes parsing memakai HTML contoh (tanpa internet). Jika situs mengubah struktur HTML,
+// perbarui contoh di sini lalu sesuaikan selector di plugin.
 const test = require('node:test');
 const assert = require('node:assert');
 const cheerio = require('cheerio');
