@@ -1,13 +1,15 @@
 'use strict';
 /**
  * Entry point.
+ * - Vercel mencari file entry yang meng-import 'express' secara langsung, jadi app dibuat di sini.
  * - Lokal  : `npm start` -> server mendengarkan di PORT.
- * - Vercel : app Express diekspor (module.exports) dan dijalankan sebagai Vercel Function,
- *            jadi tidak boleh memanggil listen().
+ * - Vercel : app diekspor (module.exports) dan dijalankan sebagai Vercel Function (tanpa listen()).
  */
-const { createApp } = require('./src/createApp');
+const express = require('express');
+const { configureApp } = require('./src/configureApp');
 
-const app = createApp();
+const app = express();
+configureApp(app);
 
 if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 3000;
