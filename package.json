@@ -1,7 +1,7 @@
 {
   "name": "komik-scraper-api",
   "version": "2.0.0",
-  "description": "API scraper komik Indonesia + web reader sederhana",
+  "description": "API scraper komik Indonesia",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

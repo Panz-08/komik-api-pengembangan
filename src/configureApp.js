@@ -1,7 +1,5 @@
 'use strict';
-const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const apiRouter = require('./routes/api');
 const registry = require('./plugins/registry');
 const { AppError } = require('./lib/errors');
@@ -24,6 +22,23 @@ function configureApp(app) {
   if (process.env.VERCEL || process.env.TRUST_PROXY) app.set('trust proxy', 1);
   app.use(cors());
 
+  app.get('/', (req, res) =>
+    res.json({
+      success: true,
+      name: 'Komik Scraper API',
+      version: require('../package.json').version,
+      endpoints: [
+        'GET /api/sites',
+        'GET /api/search?q=<judul>&site=<id>&page=1',
+        'GET /api/comics/:slug?site=<id>',
+        'GET /api/comics/:slug/chapters?site=<id>',
+        'GET /api/chapters/:chapterId/pages?site=<id>',
+        'GET /api/image?url=<url>&site=<id>',
+        'GET /health',
+      ],
+    }),
+  );
+
   app.get('/health', (req, res) =>
     res.json({ success: true, name: 'Komik Scraper API', version: require('../package.json').version, sites: registry.sites() }),
   );
@@ -36,8 +51,7 @@ function configureApp(app) {
     res.status(404).json({ success: false, error: 'Endpoint tidak ditemukan', code: 'NOT_FOUND' }),
   );
 
-  app.get('/reader', (req, res) => res.redirect('/'));
-  app.use(express.static(path.join(__dirname, '..', 'public')));
+  app.get('/favicon.ico', (req, res) => res.status(204).end());
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
