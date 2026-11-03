@@ -20,11 +20,11 @@ Konfigurasi opsional lewat environment variable (lihat `.env.example`):
 
 | id            | situs              | status        |
 |---------------|--------------------|---------------|
-| `komikindo`   | komikindo.ch       | siap (70%)    |
+| `komikindo`   | komikindo.ch       | siap          |
 | `komiku`      | komiku.org         | belum siap    |
-| `komiku-asia` | 01.komiku.asia     | belum siap    |
-| `mgkomik`     | id.mgkomik.cc      | eksperimental |
-| `shinigami`   | 11.shinigami.asia  | eksperimental (Cloudflare) X |
+| `komiku-asia` | 01.komiku.asia     | siap          |
+| `mgkomik`     | id.mgkomik.cc      | belum siap    |
+| `shinigami`   | 11.shinigami.asia  | siap (70%)    |
 
 \* Selector disusun berdasarkan struktur situs yang diketahui, dengan fallback berlapis. Bila situs mengubah
 HTML-nya, cukup sesuaikan selector di `src/plugins/<situs>.js`.
