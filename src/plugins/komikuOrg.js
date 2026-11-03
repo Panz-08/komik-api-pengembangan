@@ -12,15 +12,18 @@ class KomikuOrg extends BasePlugin {
       id: 'komiku',
       hosts: ['https://komiku.org'],
       description: 'Komiku - manga, manhwa, manhua bahasa Indonesia',
+      note: 'Halaman chapter memakai Cloudflare challenge; fallback otomatis ke FlareSolverr bila FLARESOLVERR_URL aktif.',
     });
   }
 
   async search(query, page = 1) {
     const q = encodeURIComponent(query);
-    const path = page > 1 ? `/page/${page}/?post_type=manga&s=${q}` : `/?post_type=manga&s=${q}`;
-    // pencarian ada di subdomain api.
-    const { $, url } = await this.load(`https://api.komiku.org${path}`);
-    const comics = this.collectComics($, url, '.bge a[href*="/manga/"], a[href*="/manga/"]', SLUG_RE)
+    const path = page > 1
+      ? `/page/${page}/?post_type=manga&s=${q}`
+      : `/?post_type=manga&s=${q}`;
+    // Pencarian ada di subdomain api.komiku.org, tetapi URL komik tetap di komiku.org.
+    const { $ } = await this.load(`https://api.komiku.org${path}`);
+    const comics = this.collectComics($, this.host + '/', '.bge a[href*="/manga/"], a[href*="/manga/"]', SLUG_RE)
       .filter((c) => c.id !== 'page');
     return { comics, page };
   }
@@ -43,14 +46,21 @@ class KomikuOrg extends BasePlugin {
     let chapters = this.collectChapters($, url, '#daftarChapter a, td.judulseries a');
     if (!chapters.length) chapters = this.collectChapters($, url, 'a[href*="-chapter-"]');
 
-    return { id: slug, site: this.id, url, title, cover, summary, genres: [...new Set(genres)], chapters };
+    return {
+      id: slug, site: this.id, url, title, cover, summary,
+      genres: [...new Set(genres)],
+      status: this.firstText($, ['#Informasi .status', '.status']).replace(/^status\s*:?\s*/i, '') || undefined,
+      chapters,
+    };
   }
 
   async pages(chapterUrl) {
     const { $, url } = await this.load(chapterUrl);
-    const pages = this.extractImages($, url, ['#Baca_Komik img', '.reading-area img']);
+    const pages = this.extractImages($, url, [
+      '#Baca_Komik img.ww', '#Baca_Komik img[id]', '#Baca_Komik img', '.reading-area img',
+    ]);
     if (!pages.length) throw new AppError('Gambar chapter tidak ditemukan', 404, 'NOT_FOUND');
-    return { title: this.firstText($, ['#Judul h1', 'h1']), pages };
+    return { title: this.firstText($, ['#Judul h1', 'h1', '.judulbaca']), pages };
   }
 }
 

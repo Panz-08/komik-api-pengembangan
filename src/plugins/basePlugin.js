@@ -11,7 +11,7 @@
  * Plugin melempar AppError bila gagal; registry yang mengubahnya jadi response.
  */
 const cheerio = require('cheerio');
-const { fetchHtml } = require('../lib/http');
+const { fetchHtml, fetchJson } = require('../lib/http');
 const { AppError } = require('../lib/errors');
 const {
   cleanText, toAbs, imgSrc, isComicImage, encodeId, chapterNumber, unique,
@@ -65,9 +65,25 @@ class BasePlugin {
 
   /** Muat halaman (path relatif atau URL penuh). Mirror dicoba bila host utama gagal. */
   async load(pathOrUrl) {
-    const urls = /^https?:\/\//i.test(pathOrUrl)
-      ? [pathOrUrl]
-      : this.hosts.map((h) => h + pathOrUrl);
+    let urls;
+    if (/^https?:\/\//i.test(pathOrUrl)) {
+      urls = [pathOrUrl];
+      // URL milik situs ini -> tambahkan mirror dengan path yang sama
+      if (this.ownsUrl(pathOrUrl)) {
+        let u;
+        try { u = new URL(pathOrUrl); } catch { u = null; }
+        if (u) {
+          for (const h of this.hosts) {
+            const base = new URL(h);
+            if (base.hostname === u.hostname) continue;
+            urls.push(base.origin + u.pathname + u.search);
+          }
+        }
+      }
+    } else {
+      urls = this.hosts.map((h) => h + pathOrUrl);
+    }
+
     let err;
     for (const url of urls) {
       try {
@@ -75,10 +91,22 @@ class BasePlugin {
         return { $: cheerio.load(html), url, html };
       } catch (e) {
         err = e;
-        if (e.code === 'NOT_FOUND' || e.code === 'CLOUDFLARE') throw e;
+        // coba mirror berikutnya; error terakhir yang dilempar
       }
     }
     throw err;
+  }
+
+  /** Muat endpoint JSON (untuk situs yang menyediakan API). */
+  async loadJson(pathOrUrl, opts = {}) {
+    const { headers = {}, ...rest } = opts;
+    const url = /^https?:\/\//i.test(pathOrUrl) ? pathOrUrl : this.host + pathOrUrl;
+    const data = await fetchJson(url, {
+      referer: this.host + '/',
+      headers: { Origin: this.host, ...headers },
+      ...rest,
+    });
+    return data;
   }
 
   // ---------- default implementasi ----------
@@ -149,15 +177,22 @@ class BasePlugin {
       if (!url || seen.has(url) || !this.ownsUrl(url)) return;
       if (filter && !filter(url, a)) return;
       seen.add(url);
-      const num = cleanText(a.find('.chapternum, .chapter-number, span').first().text());
-      let title = cleanText(a.attr('title')) || num || cleanText(a.text());
-      title = title.replace(/\s+\d+\s+(detik|menit|jam|hari|minggu|bulan|tahun).*$/i, '').trim();
+      const num = cleanText(
+        a.find('.chapternum, .chapter-number, .chapter-num, .num').first().text(),
+      );
+      let title = num || cleanText(a.text()) || cleanText(a.attr('title'));
+      if (title.length > 80) title = cleanText(a.attr('title')) || title;
+      title = title.replace(/\s+\d+\s+(detik|menit|jam|hari|minggu|bulan|tahun|seconds?|minutes?|hours?|days?|weeks?|months?|years?|ago).*$/i, '').trim();
+      const date =
+        cleanText(a.find('.chapter-date, .chapterdate, time').first().text()) ||
+        cleanText(a.closest('li, tr').find('.chapterdate, .dt, time, .date').first().text()) ||
+        undefined;
       out.push({
         id: encodeId(url),
         title,
         number: chapterNumber(title),
         url,
-        date: cleanText(a.closest('li, tr').find('.chapterdate, .dt, time, .date').first().text()) || undefined,
+        date,
       });
     });
     return out;
@@ -173,8 +208,10 @@ class BasePlugin {
       if (found.length) { urls = found; break; }
     }
     if (!urls.length) urls = this._imagesFromScripts($);
-    if (!urls.length) urls = $('img').map((_, el) => imgSrc($(el))).get().filter(isComicImage);
-    return unique(urls.map((u) => toAbs(u, base)).filter(Boolean));
+    if (!urls.length) urls = $('img').map((_, el) => imgSrc($(el))).get();
+    return unique(
+      urls.map((u) => toAbs(u, base)).filter((u) => u && isComicImage(u)),
+    );
   }
 
   _imagesFromScripts($) {

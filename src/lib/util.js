@@ -28,7 +28,7 @@ const imgSrc = (el) => {
 };
 
 // gambar non-konten (logo, banner, iklan, dst). "uploads/" tidak ikut terhitung iklan.
-const BAD_IMG = /(logo|avatar|gravatar|icon|banner|sprite|emoji|loading|placeholder|favicon|histats|(^|[/_-])ads?([/_.-]|$))/i;
+const BAD_IMG = /(logo|avatar|gravatar|icon|banner|sprite|emoji|loading|placeholder|favicon|histats|promosi|iklan|sponsor|(^|[/_-])ads?([/_.-]|$))/i;
 const isComicImage = (url) =>
   !!url && !url.startsWith('data:') && !BAD_IMG.test(url) &&
   (/\.(jpe?g|png|webp|avif)(\?|$)/i.test(url) || /\/uploads\//i.test(url));

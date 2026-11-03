@@ -3,6 +3,7 @@ const cors = require('cors');
 const apiRouter = require('./routes/api');
 const registry = require('./plugins/registry');
 const { AppError } = require('./lib/errors');
+const { curlIsAvailable, flareSolverrAvailable } = require('./lib/http');
 
 // rate limit sederhana per IP (tanpa dependency)
 function rateLimit({ windowMs = 60000, max = Number(process.env.RATE_LIMIT || 120) } = {}) {
@@ -39,9 +40,19 @@ function configureApp(app) {
     }),
   );
 
-  app.get('/health', (req, res) =>
-    res.json({ success: true, name: 'Komik Scraper API', version: require('../package.json').version, sites: registry.sites() }),
-  );
+  app.get('/health', async (req, res) => {
+    const [curl, flareSolverr] = await Promise.all([
+      curlIsAvailable(),
+      flareSolverrAvailable(),
+    ]);
+    res.json({
+      success: true,
+      name: 'Komik Scraper API',
+      version: require('../package.json').version,
+      sites: registry.sites(),
+      capabilities: { curl, flareSolverr },
+    });
+  });
 
   // /api/image dipakai <img> untuk banyak gambar sekaligus, jadi tidak ikut rate limit
   const limiter = rateLimit();

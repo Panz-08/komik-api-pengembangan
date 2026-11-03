@@ -12,7 +12,7 @@ const axios = require('axios');
 const registry = require('../plugins/registry');
 const { AppError } = require('../lib/errors');
 const { assertPublicUrl } = require('../lib/util');
-const { UA } = require('../lib/http');
+const { UA, curlImage } = require('../lib/http');
 
 const router = express.Router();
 const ok = (res, data) => res.json({ success: true, data });
@@ -51,36 +51,69 @@ router.get('/image', async (req, res) => {
   let site = req.query.site ? registry.getPlugin(req.query.site) : null;
 
   // ikuti redirect manual (maks 3x) sambil memeriksa tiap tujuan agar tidak bisa diarahkan ke jaringan internal
-  let upstream;
   for (let hop = 0; hop <= 3; hop++) {
     const u = await assertPublicUrl(target);
-    upstream = await axios.get(u.href, {
-      responseType: 'stream',
-      timeout: 20000,
-      maxRedirects: 0,
-      validateStatus: () => true,
-      headers: { 'User-Agent': UA, Referer: site ? site.host + '/' : u.origin + '/', Accept: 'image/*,*/*;q=0.8' },
-    });
-    if (upstream.status >= 300 && upstream.status < 400 && upstream.headers.location) {
+    const referer = site ? site.host + '/' : u.origin + '/';
+
+    let upstream = null;
+    try {
+      upstream = await axios.get(u.href, {
+        responseType: 'stream',
+        timeout: 20000,
+        maxRedirects: 0,
+        validateStatus: () => true,
+        headers: { 'User-Agent': UA, Referer: referer, Accept: 'image/*,*/*;q=0.8' },
+      });
+    } catch {
+      upstream = null;
+    }
+
+    if (upstream) {
+      if (upstream.status >= 300 && upstream.status < 400 && upstream.headers.location) {
+        upstream.data.destroy();
+        target = new URL(upstream.headers.location, u).href;
+        continue;
+      }
+      if (upstream.status < 400) {
+        const type = String(upstream.headers['content-type'] || '');
+        if (!type.startsWith('image/')) {
+          upstream.data.destroy();
+          throw new AppError('URL bukan gambar', 415, 'BAD_REQUEST');
+        }
+        res.setHeader('Content-Type', type);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        upstream.data.on('error', () => res.destroy());
+        upstream.data.pipe(res);
+        return;
+      }
       upstream.data.destroy();
-      target = new URL(upstream.headers.location, u).href;
+    }
+
+    // axios kena Cloudflare/403 atau error jaringan -> coba curl (TLS fingerprint berbeda)
+    const viaCurl = await curlImage(u.href, { referer, timeout: 20000 });
+    if (!viaCurl) {
+      throw new AppError(
+        `Gambar tidak bisa diambil${upstream ? ` (HTTP ${upstream.status})` : ''}`,
+        502, 'UPSTREAM_ERROR',
+      );
+    }
+    if (viaCurl.status >= 300 && viaCurl.status < 400 && viaCurl.headers.location) {
+      target = new URL(viaCurl.headers.location, u).href;
       continue;
     }
-    break;
+    if (viaCurl.status >= 400) {
+      throw new AppError(`Gambar tidak bisa diambil (HTTP ${viaCurl.status})`, 502, 'UPSTREAM_ERROR');
+    }
+    const type = String(viaCurl.headers['content-type'] || '');
+    if (!type.startsWith('image/')) {
+      throw new AppError('URL bukan gambar', 415, 'BAD_REQUEST');
+    }
+    res.setHeader('Content-Type', type);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.end(viaCurl.body);
+    return;
   }
-  if (upstream.status >= 400) {
-    upstream.data.destroy();
-    throw new AppError(`Gambar tidak bisa diambil (HTTP ${upstream.status})`, 502, 'UPSTREAM_ERROR');
-  }
-  const type = String(upstream.headers['content-type'] || '');
-  if (!type.startsWith('image/')) {
-    upstream.data.destroy();
-    throw new AppError('URL bukan gambar', 415, 'BAD_REQUEST');
-  }
-  res.setHeader('Content-Type', type);
-  res.setHeader('Cache-Control', 'public, max-age=86400');
-  upstream.data.on('error', () => res.destroy());
-  upstream.data.pipe(res);
+  throw new AppError('Terlalu banyak redirect saat mengambil gambar', 502, 'UPSTREAM_ERROR');
 });
 
 module.exports = router;

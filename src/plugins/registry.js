@@ -2,30 +2,16 @@
 /** Daftar plugin + dispatcher. Menambah situs baru = tambahkan satu baris di `plugins`. */
 const { AppError } = require('../lib/errors');
 const { decodeId } = require('../lib/util');
-const MadaraSite = require('./madaraSite');
 
 const plugins = [
   new (require('./komikindoCh'))(),
   new (require('./komikuOrg'))(),
   new (require('./komikuAsia'))(),
-  // --- eksperimental: aktifkan dengan ENABLE_EXPERIMENTAL=1 ---
-  new MadaraSite({
-    id: 'mgkomik',
-    hosts: ['https://id.mgkomik.cc'],
-    description: 'MGKomik',
-    experimental: true,
-    note: 'Belum terverifikasi: selector generik (tema Madara) dan belum diuji pada situs aslinya.',
-  }),
-  new MadaraSite({
-    id: 'shinigami',
-    hosts: ['https://11.shinigami.asia'],
-    description: 'Shinigami',
-    experimental: true,
-    note: 'Dilindungi Cloudflare; scraper biasa kemungkinan besar diblokir.',
-  }),
+  new (require('./mgkomik'))(),
+  new (require('./shinigami'))(),
 ];
 
-const SEARCH_TIMEOUT_MS = 20000;
+const SEARCH_TIMEOUT_MS = 25000;
 const withTimeout = (p, ms, label) =>
   Promise.race([
     p,
@@ -49,7 +35,7 @@ module.exports = {
 
   /** Cari di satu situs, atau di semua situs aktif secara paralel bila site kosong. */
   async search(q, site, page = 1) {
-    const targets = site ? [getPlugin(site)] : plugins.filter((p) => p.enabled && !p.experimental);
+    const targets = site ? [getPlugin(site)] : plugins.filter((p) => p.enabled);
     const settled = await Promise.allSettled(
       targets.map((p) => withTimeout(p.search(q, page), SEARCH_TIMEOUT_MS, p.id)),
     );
