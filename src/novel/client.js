@@ -35,8 +35,8 @@ const SOURCE = {
 
 const SERIES_FIELDS = 'id,name,slug,link,count,description';
 const CHAPTER_LIST_FIELDS = 'id,slug,link,title,date,modified,seri,featured_media';
-const CHAPTER_DETAIL_FIELDS =
-  'id,slug,link,title,date,modified,excerpt,content,seri,featured_media';
+const CHAPTER_META_FIELDS = 'id,slug,link,title,date,modified,excerpt,seri,featured_media';
+const CHAPTER_DETAIL_FIELDS = `${CHAPTER_META_FIELDS},content`;
 
 const SORTS = {
   popular: { orderby: 'count', order: 'desc' },
@@ -472,7 +472,7 @@ async function getChapter(id, { includeContent = true } = {}) {
 
   const result = await request(
     `posts/${numericId}`,
-    { _fields: CHAPTER_DETAIL_FIELDS },
+    { _fields: includeContent ? CHAPTER_DETAIL_FIELDS : CHAPTER_META_FIELDS },
     { ttl: 600 },
   );
   if (!result.data || Array.isArray(result.data)) {
