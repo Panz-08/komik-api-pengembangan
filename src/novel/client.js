@@ -13,7 +13,14 @@ const {
 } = require('./config');
 const { AppError } = require('../lib/errors');
 const { TTLCache } = require('./cache');
-const { stripHtml, truncateText, notFound, badRequest } = require('./util');
+const {
+  stripHtml,
+  truncateText,
+  htmlToParagraphs,
+  wordCount,
+  notFound,
+  badRequest,
+} = require('./util');
 
 const cache = new TTLCache({ max: CACHE_MAX_ENTRIES, ttl: CACHE_TTL_SECONDS });
 const inflight = new Map();
@@ -28,7 +35,8 @@ const SOURCE = {
 
 const SERIES_FIELDS = 'id,name,slug,link,count,description';
 const CHAPTER_LIST_FIELDS = 'id,slug,link,title,date,modified,seri,featured_media';
-const CHAPTER_DETAIL_FIELDS = 'id,slug,link,title,date,modified,excerpt,seri,featured_media';
+const CHAPTER_DETAIL_FIELDS =
+  'id,slug,link,title,date,modified,excerpt,content,seri,featured_media';
 
 const SORTS = {
   popular: { orderby: 'count', order: 'desc' },
@@ -275,7 +283,7 @@ function normalizeNovel(term) {
   };
 }
 
-function normalizeChapter(post, series = null) {
+function normalizeChapter(post, series = null, { includeContent = false } = {}) {
   const title = stripHtml(post?.title?.rendered || post?.title || '');
   const chapter = {
     id: Number(post?.id) || null,
@@ -292,6 +300,18 @@ function normalizeChapter(post, series = null) {
 
   if (post?.excerpt?.rendered) {
     chapter.excerpt = truncateText(stripHtml(post.excerpt.rendered), EXCERPT_MAX_LENGTH);
+  }
+
+  if (includeContent) {
+    const paragraphs = htmlToParagraphs(post?.content?.rendered || '');
+    if (paragraphs.length) {
+      const words = wordCount(paragraphs);
+      chapter.contentAvailable = true;
+      chapter.paragraphs = paragraphs;
+      chapter.content = paragraphs.join('\n\n');
+      chapter.wordCount = words;
+      chapter.readingMinutes = Math.max(1, Math.round(words / 200));
+    }
   }
 
   return chapter;
@@ -444,7 +464,7 @@ async function listChapters(idOrSlug, { page = 1, limit = 50, order = 'desc' } =
   };
 }
 
-async function getChapter(id) {
+async function getChapter(id, { includeContent = true } = {}) {
   const numericId = Number.parseInt(String(id), 10);
   if (!Number.isInteger(numericId) || numericId <= 0) {
     throw badRequest('ID chapter tidak valid');
@@ -475,7 +495,7 @@ async function getChapter(id) {
   }
 
   return {
-    item: normalizeChapter(result.data, series),
+    item: normalizeChapter(result.data, series, { includeContent }),
     cached: result.cached,
     ageMs: result.ageMs || 0,
   };

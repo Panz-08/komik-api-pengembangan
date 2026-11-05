@@ -1,7 +1,8 @@
 # Komik & Novel API
 
-API buat ambil data komik dari beberapa situs Indonesia, plus metadata novel dari
-[Sakuranovel](https://sakuranovel.id). Dibuat dengan Express 5 dan siap jalan di Vercel.
+API buat ambil data komik dari beberapa situs Indonesia, plus novel dari
+[Sakuranovel](https://sakuranovel.id) lengkap dengan teks chapter-nya. Dibuat dengan Express 5
+dan siap jalan di Vercel.
 
 Repo ini masih dalam tahap pengembangan. Bagian komik bergantung pada struktur HTML situs
 sumber, jadi kalau ada perubahan markup tinggal sesuaikan plugin-nya. Bagian novel memakai
@@ -13,8 +14,9 @@ REST API WordPress publik Sakuranovel, jadi tidak perlu browser headless.
 - Pencarian komik lintas situs.
 - Detail komik, daftar chapter, dan URL gambar chapter.
 - Proxy gambar untuk mengakali hotlink protection.
-- Metadata novel Sakuranovel: daftar novel, detail, daftar chapter, chapter terbaru,
-  pencarian, genre, dan statistik.
+- Novel Sakuranovel: daftar novel, detail, daftar chapter, chapter terbaru, pencarian,
+  genre, dan statistik.
+- Teks chapter novel lengkap dalam bentuk paragraf biasa (plus excerpt singkat).
 - Cache, rate limit sederhana, CORS, dan error handling.
 - Siap deploy ke Vercel tanpa konfigurasi tambahan.
 
@@ -119,7 +121,8 @@ tidak perlu menebak pola URL.
 | `GET /api/novels/latest` | Chapter terbaru dari semua novel |
 | `GET /api/novels/:idOrSlug` | Detail novel + chapter pertama/terbaru |
 | `GET /api/novels/:idOrSlug/chapters?page=1&limit=50&order=desc` | Daftar chapter |
-| `GET /api/novels/chapters/:id` | Metadata satu chapter + excerpt singkat |
+| `GET /api/novels/chapters/:id` | Satu chapter + excerpt + teks lengkap (`paragraphs`) |
+| `GET /api/novels/chapters/:id?content=0` | Metadata + excerpt saja, tanpa teks lengkap |
 | `GET /api/novels/genres` | Tag/genre populer |
 | `GET /api/novels/stats` | Jumlah novel dan chapter |
 | `GET /api/novels/source` | Info sumber novel |
@@ -142,6 +145,7 @@ curl "http://localhost:3000/api/novels/search?q=academy"
 curl "http://localhost:3000/api/novels/the-victim-of-the-academy"
 curl "http://localhost:3000/api/novels/the-victim-of-the-academy/chapters?limit=10&order=desc"
 curl "http://localhost:3000/api/novels/chapters/421269"
+curl "http://localhost:3000/api/novels/chapters/421269?content=0"
 curl "http://localhost:3000/api/novels/latest?limit=10"
 ```
 
@@ -160,7 +164,14 @@ Contoh response chapter novel:
       "slug": "the-villain-who-invests-in-a-witch-to-survive",
       "title": "The Villain Who Invests in a Witch to Survive"
     },
-    "contentAvailable": false,
+    "contentAvailable": true,
+    "paragraphs": [
+      "Paragraf pertama chapter ini.",
+      "Paragraf kedua chapter ini."
+    ],
+    "content": "Paragraf pertama chapter ini.\n\nParagraf kedua chapter ini.",
+    "wordCount": 1234,
+    "readingMinutes": 6,
     "readAt": "https://sakuranovel.id/.../"
   },
   "meta": {
@@ -215,8 +226,8 @@ test/                      tes parsing dan validasi route
 
 - Bagian komik masih bergantung pada HTML situs sumber. Kalau ada yang error, cek selector
   atau API sumbernya dulu.
-- Bagian novel hanya mengirim metadata, daftar chapter, dan excerpt singkat. Teks chapter
-  lengkap tetap dibaca di Sakuranovel.
+- Teks chapter novel diambil dari field `content` pada REST API publik Sakuranovel lalu
+  diubah jadi paragraf biasa. API ini tidak mengklaim kepemilikan atas teks tersebut.
 - Repo ini tidak berafiliasi dengan situs sumber. Semua data dan hak cipta tetap milik
   pemiliknya masing-masing.
 - Gunakan dengan wajar. Jangan jadikan API ini alat untuk membanjiri situs sumber.

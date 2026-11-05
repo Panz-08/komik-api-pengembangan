@@ -32,7 +32,7 @@ function docs() {
     version: require('../package.json').version,
     creator: 'Panz-08',
     description:
-      'API komik multi-sumber dan metadata novel Sakuranovel. ' +
+      'API komik multi-sumber dan novel Sakuranovel, lengkap dengan teks chapter. ' +
       'Dibuat dengan Express 5, siap jalan di Vercel.',
     endpoints: [
       'GET /api/sources',
@@ -47,7 +47,7 @@ function docs() {
       'GET /api/novels/latest',
       'GET /api/novels/:idOrSlug',
       'GET /api/novels/:idOrSlug/chapters',
-      'GET /api/novels/chapters/:id',
+      'GET /api/novels/chapters/:id?content=1',
       'GET /api/novels/genres',
       'GET /api/novels/stats',
       'GET /api/novels/source',
@@ -57,7 +57,7 @@ function docs() {
       comics: 'Sumber komik bisa berubah struktur HTML-nya. Plugin ada di src/plugins/.',
       novels:
         'Bagian novel memakai REST API WordPress publik Sakuranovel. ' +
-        'Tidak memakai FlareSolverr dan tidak menyalin teks chapter lengkap.',
+        'Teks chapter diambil dari field content dan disajikan sebagai paragraf biasa.',
       docs: 'Dokumentasi lengkap ada di README.md.',
     },
   };

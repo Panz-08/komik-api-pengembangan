@@ -57,6 +57,29 @@ test('normalizeChapter membatasi excerpt dan menandai konten tidak tersedia', ()
   assert.ok(chapter.excerpt.endsWith('…'));
 });
 
+test('normalizeChapter menyajikan teks lengkap saat diminta', () => {
+  const chapter = normalizeChapter(
+    {
+      id: 2,
+      slug: 'chapter-2',
+      link: 'https://sakuranovel.id/chapter-2/',
+      title: { rendered: 'Novel Chapter 2' },
+      date: '2026-01-02T00:00:00',
+      content: { rendered: '<p>Paragraf pertama.</p><p>Paragraf kedua.</p>' },
+      excerpt: { rendered: '<p>Paragraf pertama.</p>' },
+      seri: [1789],
+    },
+    null,
+    { includeContent: true },
+  );
+
+  assert.equal(chapter.contentAvailable, true);
+  assert.deepEqual(chapter.paragraphs, ['Paragraf pertama.', 'Paragraf kedua.']);
+  assert.equal(chapter.content, 'Paragraf pertama.\n\nParagraf kedua.');
+  assert.equal(chapter.wordCount, 4);
+  assert.equal(chapter.readingMinutes, 1);
+});
+
 test('normalizeGenre memetakan tag', () => {
   assert.deepEqual(normalizeGenre({ id: 17, name: 'Action', slug: 'action', count: 10 }), {
     id: 17,

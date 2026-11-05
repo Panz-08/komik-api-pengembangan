@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const {
   decodeEntities,
   stripHtml,
+  htmlToParagraphs,
+  wordCount,
   truncateText,
   parsePage,
   parseLimit,
@@ -23,6 +25,16 @@ test('stripHtml membersihkan tag dan spasi', () => {
     stripHtml('<p>Hello <strong>world</strong>.</p><p>Baris &amp; kedua</p>'),
     'Hello world . Baris & kedua',
   );
+});
+
+test('htmlToParagraphs memecah paragraf dan membuang script', () => {
+  const paragraphs = htmlToParagraphs(
+    '<p>Halo <strong>dunia</strong>.</p><script>alert(1)</script>' +
+      '<p>Baris &amp; kedua<br>lanjut</p><p>   </p>',
+  );
+
+  assert.deepEqual(paragraphs, ['Halo dunia.', 'Baris & kedua lanjut']);
+  assert.equal(wordCount(paragraphs), 5);
 });
 
 test('truncateText memotong dengan elipsis', () => {

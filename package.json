@@ -1,7 +1,7 @@
 {
   "name": "komik-novel-api",
-  "version": "2.1.0",
-  "description": "API komik multi-sumber dan metadata novel Sakuranovel",
+  "version": "2.2.0",
+  "description": "API komik multi-sumber dan novel Sakuranovel lengkap dengan teks chapter",
   "author": "Panz-08",
   "main": "server.js",
   "scripts": {

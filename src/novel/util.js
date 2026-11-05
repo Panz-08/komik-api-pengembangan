@@ -56,6 +56,27 @@ function stripHtml(value) {
     .trim();
 }
 
+function htmlToParagraphs(value) {
+  const text = String(value || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li|blockquote|tr)>/gi, '\n\n')
+    .replace(/<[^>]*>/g, '');
+
+  return decodeEntities(text)
+    .replace(/\r\n?/g, '\n')
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/[ \t]+/g, ' ').replace(/\n+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+function wordCount(paragraphs) {
+  const text = Array.isArray(paragraphs) ? paragraphs.join(' ') : String(paragraphs || '');
+  return (text.match(/[\p{L}\p{N}]+(?:['’.-][\p{L}\p{N}]+)*/gu) || []).length;
+}
+
 function truncateText(value, max = 320) {
   const text = String(value || '').trim();
   if (text.length <= max) return text;
@@ -110,6 +131,8 @@ module.exports = {
   notFound,
   decodeEntities,
   stripHtml,
+  htmlToParagraphs,
+  wordCount,
   truncateText,
   parseInteger,
   parsePage,

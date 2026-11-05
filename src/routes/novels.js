@@ -92,6 +92,14 @@ function parseSort(value) {
   return sort;
 }
 
+function parseBoolean(value, fallback = true) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const text = String(value).toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'off'].includes(text)) return false;
+  throw badRequest('content harus "1"/"0" atau "true"/"false"');
+}
+
 /** GET /api/novels */
 router.get(
   '/',
@@ -177,8 +185,8 @@ router.get(
         ...SOURCE,
         creator: CREATOR,
         note:
-          'Hanya metadata, daftar chapter, dan excerpt singkat. ' +
-          'Teks chapter lengkap tetap dibaca di situs sumber.',
+          'Menyediakan metadata, daftar chapter, excerpt, dan teks chapter dalam bentuk ' +
+          'paragraf biasa. Teks asli tetap milik Sakuranovel dan penerjemahnya.',
       },
       {},
       { maxAge: 3600 },
@@ -186,14 +194,17 @@ router.get(
   }),
 );
 
-/** GET /api/novels/chapters/:id */
+/** GET /api/novels/chapters/:id?content=1 */
 router.get(
   '/chapters/:id',
   asyncRoute(async (req, res) => {
-    const result = await getChapter(req.params.id);
+    const includeContent = parseBoolean(req.query.content, true);
+    const result = await getChapter(req.params.id, { includeContent });
     const { cached, ageMs, item } = result;
 
-    return sendData(res, item, cacheMeta(result), { maxAge: 600 });
+    return sendData(res, item, cacheMeta(result, { content: includeContent }), {
+      maxAge: 600,
+    });
   }),
 );
 
