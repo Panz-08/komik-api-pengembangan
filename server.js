@@ -14,9 +14,10 @@ configureApp(app);
 if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`\n  Komik Scraper API aktif`);
+    console.log(`\n  Komik & Novel API aktif`);
     console.log(`  Info   : http://localhost:${PORT}/`);
-    console.log(`  API    : http://localhost:${PORT}/api/sites\n`);
+    console.log(`  Komik  : http://localhost:${PORT}/api/sites`);
+    console.log(`  Novel  : http://localhost:${PORT}/api/novels\n`);
   });
 }
 

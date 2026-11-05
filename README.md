@@ -1,60 +1,226 @@
-# komik-api-pengembangan
-API baca komik manhwa, manhua, manga (tahap pengembangan)
+# Komik & Novel API
 
-# Komik Scraper API
+API buat ambil data komik dari beberapa situs Indonesia, plus metadata novel dari
+[Sakuranovel](https://sakuranovel.id). Dibuat dengan Express 5 dan siap jalan di Vercel.
 
-API scraper komik Indonesia (Node.js, Express 5).
+Repo ini masih dalam tahap pengembangan. Bagian komik bergantung pada struktur HTML situs
+sumber, jadi kalau ada perubahan markup tinggal sesuaikan plugin-nya. Bagian novel memakai
+REST API WordPress publik Sakuranovel, jadi tidak perlu browser headless.
 
-## Menjalankan
+## Fitur
+
+- Multi-sumber komik: Komikindo, Komiku, Komiku Asia, MGKomik, dan Shinigami.
+- Pencarian komik lintas situs.
+- Detail komik, daftar chapter, dan URL gambar chapter.
+- Proxy gambar untuk mengakali hotlink protection.
+- Metadata novel Sakuranovel: daftar novel, detail, daftar chapter, chapter terbaru,
+  pencarian, genre, dan statistik.
+- Cache, rate limit sederhana, CORS, dan error handling.
+- Siap deploy ke Vercel tanpa konfigurasi tambahan.
+
+## Jalankan lokal
 
 ```bash
 npm install
 npm start
+```
+
+Buka `http://localhost:3000` untuk melihat daftar endpoint.
+
+Tes:
+
+```bash
 npm test
 ```
 
-Konfigurasi opsional lewat environment variable (lihat `.env.example`):
-`PORT`, `CACHE_TTL_SECONDS`, `RATE_LIMIT`, `ENABLE_EXPERIMENTAL`.
+Konfigurasi opsional ada di `.env.example`. Untuk lokal, salin dulu:
 
-## Situs
+```bash
+cp .env.example .env
+```
 
-| id            | situs              | status        |
-|---------------|--------------------|---------------|
-| `komikindo`   | komikindo.ch       | siap          |
-| `komiku`      | komiku.org         | belum siap    |
-| `komiku-asia` | 01.komiku.asia     | siap          |
-| `mgkomik`     | id.mgkomik.cc      | belum siap    |
-| `shinigami`   | 11.shinigami.asia  | siap (70%)    |
+## Sumber data
 
-\* Selector disusun berdasarkan struktur situs yang diketahui, dengan fallback berlapis. Bila situs mengubah
-HTML-nya, cukup sesuaikan selector di `src/plugins/<situs>.js`.
-Situs eksperimental aktif dengan `ENABLE_EXPERIMENTAL=1`.
+### Komik
+
+| id | Situs | Catatan |
+|----|-------|---------|
+| `komikindo` | komikindo.ch | HTML statis |
+| `komiku` | komiku.org | Chapter tertentu bisa kena Cloudflare |
+| `komiku-asia` | 01.komiku.asia | Data Next.js flight |
+| `mgkomik` | web1.mgkomik.cc | Butuh fallback curl |
+| `shinigami` | 11.shinigami.asia | Memakai API publik `api.shngm.io` |
+
+Plugin ada di `src/plugins/`. Kalau situs sumber berubah, cukup sesuaikan selector di file
+plugin yang bersangkutan.
+
+### Novel
+
+| id | Situs | Metode |
+|----|-------|--------|
+| `sakuranovel` | sakuranovel.id | REST API WordPress `/wp-json/wp/v2` |
+
+Bagian novel **tidak** memakai FlareSolverr, browser headless, atau proxy rotasi. Yang dipakai
+adalah endpoint JSON publik milik Sakuranovel. Kalau endpoint itu sampai diblokir, API akan
+mengembalikan error `UPSTREAM_BLOCKED`, bukan mencoba menembus challenge.
 
 ## Endpoint
 
-Semua response: `{ "success": true, "data": ... }` atau `{ "success": false, "error": "pesan", "code": "KODE" }`.
+Response sukses memakai bentuk:
+
+```json
+{
+  "success": true,
+  "data": {}
+}
+```
+
+Response error:
+
+```json
+{
+  "success": false,
+  "error": "Pesan error",
+  "code": "KODE_ERROR"
+}
+```
+
+Endpoint novel menambahkan `meta` berisi sumber, pembuat, waktu generate, dan status cache.
+
+### Umum
 
 | Endpoint | Keterangan |
 |----------|------------|
-| `GET /api/sites` | daftar situs + status |
-| `GET /api/search?q=solo&site=komikindo&page=1` | cari komik. `site` kosong = cari di semua situs secara paralel (hasil per situs ada di `data.sites`) |
-| `GET /api/comics/:slug?site=komikindo` | detail komik + daftar chapter |
-| `GET /api/comics/:slug/chapters?site=komikindo` | daftar chapter saja |
-| `GET /api/chapters/:chapterId/pages?site=komikindo` | gambar chapter (`pages` = URL asli, `proxy` = lewat proxy) |
-| `GET /api/image?url=...&site=komikindo` | proxy gambar (mengirim Referer yang benar, anti hotlink) |
+| `GET /` | Dokumentasi singkat dalam JSON |
+| `GET /health` | Status API, daftar situs, dan capability runtime |
+| `GET /api/sources` | Daftar sumber komik dan novel |
 
-`chapterId` didapat dari field `id` pada daftar chapter (berisi URL chapter ter-encode), jadi tak perlu menebak pola URL.
+### Komik
+
+| Endpoint | Keterangan |
+|----------|------------|
+| `GET /api/sites` | Daftar situs komik |
+| `GET /api/search?q=solo&site=komikindo&page=1` | Cari komik. `site` kosong = cari di semua situs |
+| `GET /api/comics/:slug?site=komikindo` | Detail komik + daftar chapter |
+| `GET /api/comics/:slug/chapters?site=komikindo` | Daftar chapter saja |
+| `GET /api/chapters/:chapterId/pages?site=komikindo` | URL gambar chapter |
+| `GET /api/image?url=...&site=komikindo` | Proxy gambar + Referer yang benar |
+
+`chapterId` diambil dari field `id` pada daftar chapter. Isinya URL chapter ter-encode, jadi
+tidak perlu menebak pola URL.
+
+### Novel
+
+| Endpoint | Keterangan |
+|----------|------------|
+| `GET /api/novels?page=1&limit=20&sort=popular` | Daftar novel. `sort`: `popular`, `newest`, `title` |
+| `GET /api/novels?q=academy` | Cari novel lewat query `q` |
+| `GET /api/novels/search?q=academy` | Pencarian novel |
+| `GET /api/novels/latest` | Chapter terbaru dari semua novel |
+| `GET /api/novels/:idOrSlug` | Detail novel + chapter pertama/terbaru |
+| `GET /api/novels/:idOrSlug/chapters?page=1&limit=50&order=desc` | Daftar chapter |
+| `GET /api/novels/chapters/:id` | Metadata satu chapter + excerpt singkat |
+| `GET /api/novels/genres` | Tag/genre populer |
+| `GET /api/novels/stats` | Jumlah novel dan chapter |
+| `GET /api/novels/source` | Info sumber novel |
+
+Pencarian chapter global belum tersedia karena pencarian publik Sakuranovel hanya mengindeks
+seri/novel. Kalau butuh mencari chapter, ambil daftar chapter dari satu novel lalu filter di
+sisi client.
+
+## Contoh
+
+```bash
+# komik
+curl "http://localhost:3000/api/sites"
+curl "http://localhost:3000/api/search?q=solo&site=komikindo"
+curl "http://localhost:3000/api/comics/solo-leveling?site=komikindo"
+
+# novel
+curl "http://localhost:3000/api/novels?limit=5&sort=popular"
+curl "http://localhost:3000/api/novels/search?q=academy"
+curl "http://localhost:3000/api/novels/the-victim-of-the-academy"
+curl "http://localhost:3000/api/novels/the-victim-of-the-academy/chapters?limit=10&order=desc"
+curl "http://localhost:3000/api/novels/chapters/421269"
+curl "http://localhost:3000/api/novels/latest?limit=10"
+```
+
+Contoh response chapter novel:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 421269,
+    "title": "The Villain Who Invests in a Witch to Survive Chapter 301 Bahasa Indonesia",
+    "chapterNumber": 301,
+    "url": "https://sakuranovel.id/.../",
+    "series": {
+      "id": 1906,
+      "slug": "the-villain-who-invests-in-a-witch-to-survive",
+      "title": "The Villain Who Invests in a Witch to Survive"
+    },
+    "contentAvailable": false,
+    "readAt": "https://sakuranovel.id/.../"
+  },
+  "meta": {
+    "source": "Sakuranovel",
+    "sourceUrl": "https://sakuranovel.id",
+    "creator": "Panz-08",
+    "cached": false
+  }
+}
+```
+
+## Deploy ke Vercel
+
+1. Push repo ini ke GitHub.
+2. Buka [vercel.com/new](https://vercel.com/new), import repo.
+3. Framework preset: **Other / Express**.
+4. Build command dan output directory: biarkan kosong.
+5. Deploy.
+
+`server.js` mengekspor Express app, jadi Vercel bisa mendeteksinya langsung. `vercel.json`
+menaikkan `maxDuration` function menjadi 300 detik.
+
+Environment variable yang biasanya perlu diatur di Vercel:
+
+| Nama | Default | Keterangan |
+|------|---------|------------|
+| `RATE_LIMIT` | `120` | Request per menit per IP |
+| `CACHE_TTL_SECONDS` | `300` | Cache plugin komik |
+| `FLARESOLVERR_URL` | kosong | Opsional, hanya untuk komik yang kena Cloudflare |
+| `CURL_FALLBACK` | `1` | Fallback curl untuk komik |
+| `SAKURANOVEL_CACHE_TTL_SECONDS` | `300` | Cache novel |
+| `SAKURANOVEL_TIMEOUT_MS` | `12000` | Timeout request novel |
+
+Vercel menjalankan app sebagai satu function. Cache in-memory dan rate limit berlaku per
+instance, bukan global. Kalau butuh pembatasan yang lebih serius, pakai Vercel Firewall atau
+Redis (misalnya Upstash).
 
 ## Struktur
 
-```
-server.js              entry point
-src/app.js             Express app (CORS, rate limit, error handler)
-src/routes/api.js      endpoint
-src/lib/               http client (retry/cache/Cloudflare), util, error
-src/plugins/           satu file per situs + registry
-public/index.html      web reader
-test/                  tes
+```text
+server.js                  entry point lokal + Vercel
+src/configureApp.js        CORS, rate limit, health, error handler
+src/routes/api.js          endpoint komik
+src/routes/novels.js       endpoint novel
+src/plugins/               plugin komik per situs
+src/novel/                 client, cache, util, dan config Sakuranovel
+src/lib/                   http client komik, error, util
+test/                      tes parsing dan validasi route
 ```
 
-IDK
+## Catatan
+
+- Bagian komik masih bergantung pada HTML situs sumber. Kalau ada yang error, cek selector
+  atau API sumbernya dulu.
+- Bagian novel hanya mengirim metadata, daftar chapter, dan excerpt singkat. Teks chapter
+  lengkap tetap dibaca di Sakuranovel.
+- Repo ini tidak berafiliasi dengan situs sumber. Semua data dan hak cipta tetap milik
+  pemiliknya masing-masing.
+- Gunakan dengan wajar. Jangan jadikan API ini alat untuk membanjiri situs sumber.
+
+## Lisensi
+
+MIT. Silakan dipakai dan dimodifikasi, tapi tetap cantumkan sumber datanya.
