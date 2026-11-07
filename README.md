@@ -2,7 +2,7 @@
 
 API buat ambil data komik dari beberapa situs Indonesia, plus novel dari
 [Sakuranovel](https://sakuranovel.id) lengkap dengan teks chapter-nya. Dibuat dengan Express 5
-dan siap jalan di Vercel.
+dan siap jalan di Vercel maupun Wokku.
 
 Repo ini masih dalam tahap pengembangan. Bagian komik bergantung pada struktur HTML situs
 sumber, jadi kalau ada perubahan markup tinggal sesuaikan plugin-nya. Bagian novel memakai
@@ -18,7 +18,7 @@ REST API WordPress publik Sakuranovel, jadi tidak perlu browser headless.
   genre, dan statistik.
 - Teks chapter novel lengkap dalam bentuk paragraf biasa (plus excerpt singkat).
 - Cache, rate limit sederhana, CORS, dan error handling.
-- Siap deploy ke Vercel tanpa konfigurasi tambahan.
+- Siap deploy ke Vercel atau Wokku tanpa konfigurasi tambahan.
 
 ## Jalankan lokal
 
@@ -208,6 +208,25 @@ Environment variable yang biasanya perlu diatur di Vercel:
 Vercel menjalankan app sebagai satu function. Cache in-memory dan rate limit berlaku per
 instance, bukan global. Kalau butuh pembatasan yang lebih serius, pakai Vercel Firewall atau
 Redis (misalnya Upstash).
+
+## Deploy ke Wokku
+
+Wokku cocok kalau mau API jalan di server sendiri tanpa cold start function. App-nya memakai
+Nixpacks dan otomatis menjalankan `npm start`.
+
+1. Buat app Node.js di dashboard Wokku, pilih server yang sudah terhubung.
+2. Tambahkan remote Wokku di repo:
+
+   ```bash
+   git remote add wokku git@git.wokku.cloud:komik-api-pengembangan
+   git push wokku main
+   ```
+
+3. Wokku otomatis build dan menjalankan `server.js`. API mendengarkan `process.env.PORT`,
+   jadi tidak perlu konfigurasi tambahan.
+
+Environment variable yang sama seperti di Vercel bisa diatur lewat menu **Config** app.
+Contoh hasil deploy: `https://komik-api-pengembangan.wokku.app`.
 
 ## Struktur
 
