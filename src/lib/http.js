@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { AppError } = require('./errors');
+const { MAX_IMAGE_BYTES } = require('./limits');
 
 const execFileAsync = promisify(execFile);
 
@@ -249,11 +250,12 @@ async function curlFetch(url, { referer, timeout = 15000, accept } = {}) {
 }
 
 /** Fallback curl untuk gambar (binary). Mengembalikan {status, headers, body:Buffer}. */
-async function curlImage(url, { referer, timeout = 20000 } = {}) {
+async function curlImage(url, { referer, timeout = 20000, maxBytes = MAX_IMAGE_BYTES } = {}) {
   if (!CURL_FALLBACK || curlAvailable === false) return null;
   const args = [
     '-sS', '--max-redirs', '0', '--compressed',
     '--max-time', String(Math.max(5, Math.ceil(timeout / 1000))),
+    '--max-filesize', String(maxBytes),
     '-A', UA,
     '-H', 'Accept: image/avif,image/webp,image/*,*/*;q=0.8',
     '-D', '-', '-o', '-',
@@ -266,7 +268,8 @@ async function curlImage(url, { referer, timeout = 20000 } = {}) {
   try {
     const { stdout } = await execFileAsync('curl', args, {
       timeout: timeout + 4000,
-      maxBuffer: 40 * 1024 * 1024,
+      // Batasi buffer sedikit di atas maxBytes untuk menampung header.
+      maxBuffer: maxBytes + 1024 * 1024,
       encoding: 'buffer',
     });
     curlAvailable = true;
@@ -284,6 +287,11 @@ async function curlImage(url, { referer, timeout = 20000 } = {}) {
     return { status, headers, body };
   } catch (e) {
     if (e.code === 'ENOENT') curlAvailable = false;
+    // curl exit 63 = ukuran melebihi --max-filesize; maxBuffer juga berarti
+    // body terlalu besar untuk ditampung.
+    if (e.code === 63 || e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+      return { status: 0, headers: {}, body: Buffer.alloc(0), tooLarge: true };
+    }
     return null;
   }
 }

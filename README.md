@@ -110,7 +110,7 @@ Endpoint novel menambahkan `meta` berisi sumber, pembuat, waktu generate, dan st
 | `GET /api/comics/:slug?site=komikindo` | Detail komik + daftar chapter |
 | `GET /api/comics/:slug/chapters?site=komikindo` | Daftar chapter saja |
 | `GET /api/chapters/:chapterId/pages?site=komikindo` | URL gambar chapter |
-| `GET /api/image?url=...&site=komikindo` | Proxy gambar + Referer yang benar |
+| `GET /api/image?url=...&site=komikindo` | Proxy gambar + Referer yang benar (maks 10 MB) |
 
 `chapterId` diambil dari field `id` pada daftar chapter. Isinya URL chapter ter-encode, jadi
 tidak perlu menebak pola URL.
@@ -206,6 +206,8 @@ Environment variable yang biasanya perlu diatur di Vercel:
 | `CACHE_TTL_SECONDS` | `300` | Cache plugin komik |
 | `FLARESOLVERR_URL` | kosong | Opsional, hanya untuk komik yang kena Cloudflare |
 | `CURL_FALLBACK` | `1` | Fallback curl untuk komik |
+| `MAX_IMAGE_BYTES` | `10485760` | Batas ukuran gambar `/api/image` (10 MB) |
+| `IMAGE_TIMEOUT_MS` | `30000` | Batas waktu total satu request gambar |
 | `SAKURANOVEL_CACHE_TTL_SECONDS` | `300` | Cache novel |
 | `SAKURANOVEL_TIMEOUT_MS` | `12000` | Timeout request novel |
 
