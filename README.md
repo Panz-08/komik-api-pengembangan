@@ -1,5 +1,9 @@
 # Komik & Novel API
 
+[![CI](https://github.com/Panz-08/komik-api-pengembangan/actions/workflows/ci.yml/badge.svg)](https://github.com/Panz-08/komik-api-pengembangan/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node: >= 20](https://img.shields.io/badge/node-%3E%3D20-339933)](package.json)
+
 API buat ambil data komik dari beberapa situs Indonesia, plus novel dari
 [Sakuranovel](https://sakuranovel.id) lengkap dengan teks chapter-nya. Dibuat dengan Express 5
 dan siap jalan di Vercel maupun Wokku.
