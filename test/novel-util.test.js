@@ -16,7 +16,7 @@ const {
 } = require('../src/novel/util');
 
 test('decodeEntities mendukung entity umum dan numerik', () => {
-  assert.equal(decodeEntities('A &amp; B &#8217;90 &#x2014; C'), 'A & B ’90 - C');
+  assert.equal(decodeEntities('A &amp; B &#8217;90 &#x2014; C'), 'A & B ’90 — C');
   assert.equal(decodeEntities('&unknown;'), '&unknown;');
 });
 
