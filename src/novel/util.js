@@ -14,7 +14,7 @@ const ENTITIES = {
   ldquo: '“',
   lsquo: '‘',
   lt: '<',
-  mdash: '—',
+  mdash: '-',
   nbsp: ' ',
   ndash: '–',
   quot: '"',
