@@ -6,6 +6,14 @@ const registry = require('./plugins/registry');
 const { SOURCE: NOVEL_SOURCE } = require('./novel/client');
 const { AppError } = require('./lib/errors');
 const { curlIsAvailable, flareSolverrAvailable } = require('./lib/http');
+const {
+  ALLOWED_ORIGINS,
+  AUTH_REQUIRED,
+  isOriginAllowed,
+  isPublicPath,
+  requireAllowedOrigin,
+  requireApiKey,
+} = require('./lib/auth');
 
 // Rate limit sederhana per IP. Di Vercel batas ini berlaku per instance.
 function rateLimit({ windowMs = 60000, max = Number(process.env.RATE_LIMIT || 120) } = {}) {
@@ -60,6 +68,17 @@ function docs() {
         'Teks chapter diambil dari field content dan disajikan sebagai paragraf biasa.',
       docs: 'Dokumentasi lengkap ada di README.md.',
     },
+    auth: AUTH_REQUIRED
+      ? {
+          required: true,
+          header: 'x-api-key',
+          alternative: 'Authorization: Bearer <key>',
+          note: 'Endpoint data hanya bisa dipakai dengan API key pemilik deployment.',
+        }
+      : {
+          required: false,
+          note: 'API masih terbuka. Set API_KEYS di environment sebelum deploy publik.',
+        },
   };
 }
 
@@ -68,7 +87,31 @@ function configureApp(app) {
 
   // Di balik proxy Vercel agar req.ip dan req.protocol mengikuti request asli.
   if (process.env.VERCEL || process.env.TRUST_PROXY) app.set('trust proxy', 1);
-  app.use(cors());
+
+  // Header keamanan dasar untuk semua response.
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
+
+  // Tolak browser dari origin yang tidak diizinkan sebelum request di proses.
+  app.use(requireAllowedOrigin);
+
+  // Bila ALLOWED_ORIGINS diisi, CORS hanya membuka origin tersebut.
+  const corsOptions = ALLOWED_ORIGINS.length
+    ? {
+        origin(origin, callback) {
+          if (!origin || isOriginAllowed(origin)) return callback(null, true);
+          return callback(null, false);
+        },
+        methods: ['GET', 'HEAD', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'X-API-Key', 'Authorization'],
+        maxAge: 86400,
+      }
+    : {};
+  app.use(cors(corsOptions));
 
   app.get('/', (req, res) => res.json(docs()));
 
@@ -86,12 +129,20 @@ function configureApp(app) {
       sites: registry.sites(),
       novel: NOVEL_SOURCE,
       capabilities: { curl, flareSolverr },
+      authRequired: AUTH_REQUIRED,
     });
   });
 
   // /api/image dipakai <img> untuk banyak gambar sekaligus, jadi tidak ikut rate limit.
   const limiter = rateLimit();
   app.use('/api', (req, res, next) => (req.path === '/image' ? next() : limiter(req, res, next)));
+
+  // Semua endpoint selain dokumentasi/health wajib API key. /api/image punya
+  // pemeriksaan sendiri karena harus menerima URL bertanda tangan dari <img>.
+  app.use((req, res, next) => {
+    if (isPublicPath(req.path) || req.path === '/api/image') return next();
+    return requireApiKey(req, res, next);
+  });
 
   app.get('/api/sources', (req, res) =>
     res.json({

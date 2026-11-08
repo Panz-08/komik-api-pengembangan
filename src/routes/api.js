@@ -14,11 +14,16 @@ const { AppError } = require('../lib/errors');
 const { assertPublicUrl } = require('../lib/util');
 const { UA, curlImage } = require('../lib/http');
 const { MAX_IMAGE_BYTES, contentLengthTooLarge, formatBytes } = require('../lib/limits');
+const { isValidKey, keyFromRequest, AUTH_REQUIRED } = require('../lib/auth');
+const { signImageUrl, verifyImageRequest } = require('../lib/signedUrl');
 
 const router = express.Router();
 const ok = (res, data) => res.json({ success: true, data });
-const imageProxy = (url, site) =>
-  `/api/image?url=${encodeURIComponent(url)}${site ? `&site=${encodeURIComponent(site)}` : ''}`;
+const imageProxy = (url, site) => {
+  const signed = signImageUrl(url, site || '');
+  const signature = signed ? `&exp=${signed.exp}&sig=${encodeURIComponent(signed.sig)}` : '';
+  return `/api/image?url=${encodeURIComponent(url)}${site ? `&site=${encodeURIComponent(site)}` : ''}${signature}`;
+};
 
 // Batas waktu total satu request gambar (termasuk redirect dan fallback curl).
 const IMAGE_TIMEOUT_MS = Math.max(5000, Number(process.env.IMAGE_TIMEOUT_MS || 30000));
@@ -51,6 +56,16 @@ router.get('/chapters/:chapterId/pages', async (req, res) => {
 });
 
 router.get('/image', async (req, res) => {
+  // <img> tidak bisa mengirim header, jadi izinkan tanda tangan URL yang sah.
+  // Kunci API tetap diterima untuk pemakaian langsung (curl/Postman).
+  if (AUTH_REQUIRED && !verifyImageRequest(req) && !isValidKey(keyFromRequest(req))) {
+    throw new AppError(
+      'URL gambar tidak memiliki tanda tangan yang sah atau sudah kedaluwarsa',
+      401,
+      'UNAUTHORIZED',
+    );
+  }
+
   let target = String(req.query.url || '');
   let site = req.query.site ? registry.getPlugin(req.query.site) : null;
 

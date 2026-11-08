@@ -22,6 +22,7 @@ REST API WordPress publik Sakuranovel, jadi tidak perlu browser headless.
   genre, dan statistik.
 - Teks chapter novel lengkap dalam bentuk paragraf biasa (plus excerpt singkat).
 - Cache, rate limit sederhana, CORS, dan error handling.
+- API key, allowlist origin, dan URL gambar bertanda tangan (opsional, aktif lewat env).
 - Siap deploy ke Vercel atau Wokku tanpa konfigurasi tambahan.
 
 ## Jalankan lokal
@@ -202,6 +203,11 @@ Environment variable yang biasanya perlu diatur di Vercel:
 
 | Nama | Default | Keterangan |
 |------|---------|------------|
+| `API_KEYS` | kosong | **Wajib untuk deployment publik.** Satu atau beberapa kunci, pisahkan dengan koma |
+| `REQUIRE_API_KEY` | `0` | Set `1` untuk menolak semua request bila `API_KEYS` kosong |
+| `ALLOWED_ORIGINS` | kosong | Daftar origin frontend yang boleh memakai API dari browser |
+| `IMAGE_SIGNING_SECRET` | `API_KEYS` pertama | Secret tanda tangan URL gambar |
+| `IMAGE_URL_TTL_SECONDS` | `86400` | Umur URL gambar bertanda tangan |
 | `RATE_LIMIT` | `120` | Request per menit per IP |
 | `CACHE_TTL_SECONDS` | `300` | Cache plugin komik |
 | `FLARESOLVERR_URL` | kosong | Opsional, hanya untuk komik yang kena Cloudflare |
@@ -214,6 +220,54 @@ Environment variable yang biasanya perlu diatur di Vercel:
 Vercel menjalankan app sebagai satu function. Cache in-memory dan rate limit berlaku per
 instance, bukan global. Kalau butuh pembatasan yang lebih serius, pakai Vercel Firewall atau
 Redis (misalnya Upstash).
+
+## Mengunci API agar hanya bisa dipakai sendiri
+
+Tanpa konfigurasi tambahan, API tetap terbuka seperti sebelumnya (cocok untuk lokal).
+Untuk deployment publik, set environment variable berikut di Vercel:
+
+```bash
+# buat kunci acak
+openssl rand -hex 32
+
+# contoh isi environment di Vercel
+API_KEYS=hasil_openssl_tadi
+ALLOWED_ORIGINS=https://proyekku.vercel.app
+IMAGE_SIGNING_SECRET=hasil_openssl_lain
+```
+
+Setelah `API_KEYS` diisi:
+
+- Semua endpoint data (`/api/*`) menolak request tanpa kunci.
+- Kirim kunci lewat header `x-api-key` atau `Authorization: Bearer <kunci>`.
+- `/api/image` tetap bisa dipakai `<img>` karena URL-nya ditandatangani otomatis dan
+  kedaluwarsa sesuai `IMAGE_URL_TTL_SECONDS`.
+- `/` dan `/health` tetap terbuka supaya mudah dicek, tetapi tidak mengembalikan data komik/novel.
+
+Contoh:
+
+```bash
+curl -H "x-api-key: $API_KEY" \
+  "https://komik-api-pengembangan.vercel.app/api/novels?limit=5"
+
+curl -H "Authorization: Bearer $API_KEY" \
+  "https://komik-api-pengembangan.vercel.app/api/search?q=solo&site=komikindo"
+```
+
+`ALLOWED_ORIGINS` menolak browser dari situs lain. Ini **bukan** pengganti API key karena
+request non-browser (curl/Postman) tidak mengirim `Origin`. Pakai keduanya.
+
+### Memakai dari frontend di Vercel
+
+- **Disarankan (server-side):** simpan kunci sebagai environment biasa (bukan
+  `NEXT_PUBLIC_*`), lalu panggil API dari Server Component, Route Handler, atau Vercel
+  Function milikmu. Kunci tidak pernah sampai ke browser.
+- **Frontend statis (client-side):** kunci akan terlihat di browser/network tab. Kalau tetap
+  dilakukan, isi `ALLOWED_ORIGINS` dan siapkan rotasi kunci bila disalahgunakan. Untuk data
+  yang benar-benar privat, gunakan proxy server-side.
+
+Orang lain yang ingin memakai API ini sebaiknya fork/deploy sendiri dan mengisi `API_KEYS`
+milik mereka. Kunci di deployment kamu tidak perlu dibagikan.
 
 ## Deploy ke Wokku
 
@@ -243,8 +297,10 @@ src/routes/api.js          endpoint komik
 src/routes/novels.js       endpoint novel
 src/plugins/               plugin komik per situs
 src/novel/                 client, cache, util, dan config Sakuranovel
+src/lib/auth.js            API key, allowlist origin, dan helper keamanan
+src/lib/signedUrl.js       tanda tangan URL /api/image
 src/lib/                   http client komik, error, util
-test/                      tes parsing dan validasi route
+test/                      tes parsing, validasi route, dan kontrol akses
 ```
 
 ## Catatan
