@@ -3,7 +3,7 @@ const cors = require('cors');
 const apiRouter = require('./routes/api');
 const novelsRouter = require('./routes/novels');
 const registry = require('./plugins/registry');
-const { SOURCE: NOVEL_SOURCE } = require('./novel/client');
+const { SOURCE: NOVEL_SOURCE, getNovelDetail, listChapters } = require('./novel/client');
 const { AppError } = require('./lib/errors');
 const { curlIsAvailable, flareSolverrAvailable } = require('./lib/http');
 const {
@@ -133,7 +133,7 @@ function configureApp(app) {
     };
 
     // Probe ringan untuk memastikan server ini masih bisa menjangkau sumber data.
-    // Contoh: /health?probe=novel,komik
+    // Contoh: /health?probe=novel,komik atau /health?probe=noveldetail&slug=judul-novel
     const probes = String(req.query.probe || '')
       .split(',')
       .map((item) => item.trim())
@@ -145,9 +145,42 @@ function configureApp(app) {
         komik: 'https://komikindo.ch/',
       };
       const results = {};
+      const slug = String(req.query.slug || '').trim();
 
       await Promise.all(
         probes.map(async (name) => {
+          // Probe yang memakai kode aplikasi asli (bukan fetch mentah), supaya
+          // waktu yang dilaporkan sama dengan yang dialami endpoint sebenarnya.
+          if (name === 'noveldetail' || name === 'novelchapters') {
+            if (!/^[a-z0-9][a-z0-9-]{0,119}$/i.test(slug)) {
+              results[name] = { error: 'slug tidak valid' };
+              return;
+            }
+
+            const started = Date.now();
+            try {
+              if (name === 'noveldetail') {
+                const detail = await getNovelDetail(slug);
+                results[name] = {
+                  ms: Date.now() - started,
+                  chapterCount: detail.chapterCount,
+                  hasFirst: Boolean(detail.firstChapter),
+                  hasLatest: Boolean(detail.latestChapter),
+                };
+              } else {
+                const list = await listChapters(slug, { page: 1, limit: 50, order: 'desc' });
+                results[name] = { ms: Date.now() - started, items: list.items.length };
+              }
+            } catch (error) {
+              results[name] = {
+                ms: Date.now() - started,
+                error: error && error.message,
+                code: error && error.code,
+              };
+            }
+            return;
+          }
+
           const url = targets[name];
           if (!url) {
             results[name] = { error: 'probe tidak dikenal' };
