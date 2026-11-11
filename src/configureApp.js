@@ -135,6 +135,11 @@ function configureApp(app) {
       novel: NOVEL_SOURCE,
       capabilities: { curl, flareSolverr },
       authRequired: AUTH_REQUIRED,
+      rateLimit: {
+        max: Number(process.env.RATE_LIMIT || 120),
+        windowSeconds: 60,
+        per: 'IP (per instance)',
+      },
     };
 
     // Probe ringan untuk memastikan server ini masih bisa menjangkau sumber data.
