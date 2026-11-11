@@ -121,7 +121,7 @@ function configureApp(app) {
       flareSolverrAvailable(),
     ]);
 
-    res.json({
+    const payload = {
       success: true,
       name: 'Komik & Novel API',
       version: require('../package.json').version,
@@ -130,7 +130,62 @@ function configureApp(app) {
       novel: NOVEL_SOURCE,
       capabilities: { curl, flareSolverr },
       authRequired: AUTH_REQUIRED,
-    });
+    };
+
+    // Probe ringan untuk memastikan server ini masih bisa menjangkau sumber data.
+    // Contoh: /health?probe=novel,komik
+    const probes = String(req.query.probe || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (probes.length) {
+      const targets = {
+        novel: `${NOVEL_SOURCE.baseUrl}/wp-json/wp/v2/seri?per_page=1&_fields=id`,
+        komik: 'https://komikindo.ch/',
+      };
+      const results = {};
+
+      await Promise.all(
+        probes.map(async (name) => {
+          const url = targets[name];
+          if (!url) {
+            results[name] = { error: 'probe tidak dikenal' };
+            return;
+          }
+
+          const started = Date.now();
+          try {
+            const response = await fetch(url, {
+              redirect: 'follow',
+              signal: AbortSignal.timeout(10000),
+              headers: {
+                Accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
+                'User-Agent': 'KomikNovelAPI/2.2 (health-probe; creator: Panz-08)',
+              },
+            });
+            const body = await response.text();
+            results[name] = {
+              status: response.status,
+              ms: Date.now() - started,
+              bytes: body.length,
+              challenge: /just a moment|attention required|cf-chl|enable javascript and cookies/i.test(
+                body.slice(0, 20000),
+              ),
+            };
+          } catch (error) {
+            results[name] = {
+              ms: Date.now() - started,
+              error: error && error.name === 'TimeoutError' ? 'timeout' : String(error && error.message),
+            };
+          }
+        }),
+      );
+
+      payload.probes = results;
+    }
+
+    res.json(payload);
   });
 
   // /api/image dipakai <img> untuk banyak gambar sekaligus, jadi tidak ikut rate limit.
