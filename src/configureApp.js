@@ -3,7 +3,12 @@ const cors = require('cors');
 const apiRouter = require('./routes/api');
 const novelsRouter = require('./routes/novels');
 const registry = require('./plugins/registry');
-const { SOURCE: NOVEL_SOURCE, getNovelDetail, listChapters } = require('./novel/client');
+const {
+  SOURCE: NOVEL_SOURCE,
+  getNovelDetail,
+  listChapters,
+  getChapter,
+} = require('./novel/client');
 const { AppError } = require('./lib/errors');
 const { curlIsAvailable, flareSolverrAvailable } = require('./lib/http');
 const {
@@ -151,6 +156,31 @@ function configureApp(app) {
         probes.map(async (name) => {
           // Probe yang memakai kode aplikasi asli (bukan fetch mentah), supaya
           // waktu yang dilaporkan sama dengan yang dialami endpoint sebenarnya.
+          if (name === 'novelchapter') {
+            const id = String(req.query.id || '').trim();
+            if (!/^\d{1,12}$/.test(id)) {
+              results[name] = { error: 'id chapter tidak valid' };
+              return;
+            }
+            const started = Date.now();
+            try {
+              const chapter = await getChapter(id);
+              results[name] = {
+                ms: Date.now() - started,
+                paragraphs: (chapter.paragraphs || []).length,
+                contentLength: String(chapter.content || '').length,
+                wordCount: chapter.wordCount,
+              };
+            } catch (error) {
+              results[name] = {
+                ms: Date.now() - started,
+                error: error && error.message,
+                code: error && error.code,
+              };
+            }
+            return;
+          }
+
           if (name === 'noveldetail' || name === 'novelchapters') {
             if (!/^[a-z0-9][a-z0-9-]{0,119}$/i.test(slug)) {
               results[name] = { error: 'slug tidak valid' };
