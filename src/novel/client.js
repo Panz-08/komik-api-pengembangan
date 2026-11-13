@@ -598,6 +598,106 @@ async function listGenres({ limit = 50 } = {}) {
   };
 }
 
+/** PRNG kecil dan deterministik supaya pilihan "acak" bisa direproduksi lewat seed. */
+function mulberry32(seed) {
+  let state = Number(seed) >>> 0;
+  return function next() {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function pickIndex(length, random = Math.random) {
+  const size = Number(length);
+  if (!Number.isFinite(size) || size <= 0) return -1;
+  const value = Number(random());
+  const safe = Number.isFinite(value) ? Math.min(Math.max(value, 0), 0.999999999) : 0;
+  return Math.floor(safe * size);
+}
+
+/** Ambil satu novel acak. Seed opsional membuat hasilnya bisa diulang. */
+async function randomNovel({ limit = 20, seed = null } = {}) {
+  const perPage = Math.max(1, Math.min(100, Number(limit) || 20));
+  const actualSeed = Number.isInteger(seed) && seed >= 0 ? seed : Math.floor(Math.random() * 4294967296);
+  const random = mulberry32(actualSeed);
+
+  // totalPages harus dihitung dengan per_page yang sama seperti halaman yang
+  // nanti diambil, supaya halaman acaknya tetap valid.
+  const count = await request(
+    'seri',
+    { per_page: perPage, _fields: SERIES_FIELDS },
+    { ttl: 300 },
+  );
+  const total = Number.isFinite(count.total) ? count.total : 0;
+  const totalPages = Number.isFinite(count.totalPages) ? Math.max(1, count.totalPages) : 1;
+
+  let page = 1 + pickIndex(totalPages, random);
+  let result = await listNovels({ page, limit: perPage, sort: 'popular' });
+  let items = result.items;
+
+  // Halaman terakhir bisa kosong kalau data berubah di antara dua request.
+  if (!items.length && page > 1) {
+    page = 1;
+    result = await listNovels({ page, limit: perPage, sort: 'popular' });
+    items = result.items;
+  }
+  if (!items.length) throw notFound('Novel tidak ditemukan');
+
+  return {
+    item: items[pickIndex(items.length, random)],
+    seed: actualSeed,
+    page,
+    total,
+    totalPages,
+    cached: result.cached,
+    ageMs: result.ageMs || 0,
+  };
+}
+
+/** Ambil satu chapter acak dari sebuah novel. */
+async function randomChapter(idOrSlug, { limit = 100, seed = null } = {}) {
+  const perPage = Math.max(1, Math.min(100, Number(limit) || 100));
+  const actualSeed = Number.isInteger(seed) && seed >= 0 ? seed : Math.floor(Math.random() * 4294967296);
+  const random = mulberry32(actualSeed);
+  const { item: novel } = await findNovel(idOrSlug);
+
+  const common = {
+    seri: novel.id,
+    per_page: perPage,
+    orderby: 'date',
+    _fields: CHAPTER_LIST_FIELDS,
+  };
+  const count = await request('posts', { ...common, order: 'asc' }, { ttl: 120 });
+  const total = Number.isFinite(count.total) ? count.total : 0;
+  const totalPages = Number.isFinite(count.totalPages) ? Math.max(1, count.totalPages) : 1;
+
+  let page = 1 + pickIndex(totalPages, random);
+  let result = await request('posts', { ...common, page, order: 'asc' }, { ttl: 120 });
+  let posts = Array.isArray(result.data) ? result.data : [];
+
+  if (!posts.length && page > 1) {
+    page = 1;
+    result = await request('posts', { ...common, page: 1, order: 'asc' }, { ttl: 120 });
+    posts = Array.isArray(result.data) ? result.data : [];
+  }
+  if (!posts.length) throw notFound('Chapter tidak ditemukan');
+
+  const seriesRef = { ...novel, name: novel.title };
+  return {
+    novel,
+    chapter: normalizeChapter(posts[pickIndex(posts.length, random)], seriesRef),
+    seed: actualSeed,
+    page,
+    total,
+    totalPages,
+    cached: result.cached,
+    ageMs: result.ageMs || 0,
+  };
+}
+
 async function getStats() {
   const [series, posts] = await Promise.all([
     request('seri', { per_page: 1, _fields: 'id' }, { ttl: 300 }),
@@ -625,6 +725,10 @@ module.exports = {
   searchNovels,
   listGenres,
   getStats,
+  randomNovel,
+  randomChapter,
+  mulberry32,
+  pickIndex,
   normalizeNovel,
   normalizeChapter,
   normalizeGenre,

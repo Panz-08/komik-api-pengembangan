@@ -19,6 +19,8 @@ const {
   searchNovels,
   listGenres,
   getStats,
+  randomNovel,
+  randomChapter,
 } = require('../novel/client');
 
 const router = express.Router();
@@ -90,6 +92,19 @@ function parseSort(value) {
     throw badRequest('sort harus "popular", "newest", atau "title"');
   }
   return sort;
+}
+
+function parseSeed(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const text = String(value).trim();
+  if (!/^\d{1,10}$/.test(text)) {
+    throw badRequest('seed harus berupa angka bulat 0 sampai 4294967295');
+  }
+  const seed = Number(text);
+  if (!Number.isSafeInteger(seed) || seed > 4294967295) {
+    throw badRequest('seed harus berupa angka bulat 0 sampai 4294967295');
+  }
+  return seed;
 }
 
 function parseBoolean(value, fallback = true) {
@@ -172,6 +187,55 @@ router.get(
     const { cached, ageMs, ...data } = result;
 
     return sendData(res, data, cacheMeta(result), { maxAge: 300 });
+  }),
+);
+
+/** GET /api/novels/random?seed=123&limit=20 */
+router.get(
+  '/random',
+  asyncRoute(async (req, res) => {
+    const limit = parseLimit(req.query.limit, 20, 50);
+    const seed = parseSeed(req.query.seed);
+    const result = await randomNovel({ limit, seed });
+    const { cached, ageMs, item, ...rest } = result;
+
+    return sendData(
+      res,
+      item,
+      cacheMeta(result, {
+        random: {
+          seed: rest.seed,
+          page: rest.page,
+          total: rest.total,
+          totalPages: rest.totalPages,
+        },
+      }),
+      { maxAge: 0 },
+    );
+  }),
+);
+
+/** GET /api/novels/:idOrSlug/random-chapter?seed=123 */
+router.get(
+  '/:idOrSlug/random-chapter',
+  asyncRoute(async (req, res) => {
+    const seed = parseSeed(req.query.seed);
+    const result = await randomChapter(req.params.idOrSlug, { seed });
+    const { cached, ageMs, ...data } = result;
+
+    return sendData(
+      res,
+      { novel: data.novel, chapter: data.chapter },
+      cacheMeta(result, {
+        random: {
+          seed: data.seed,
+          page: data.page,
+          total: data.total,
+          totalPages: data.totalPages,
+        },
+      }),
+      { maxAge: 0 },
+    );
   }),
 );
 

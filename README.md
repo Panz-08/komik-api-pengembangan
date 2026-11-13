@@ -20,6 +20,8 @@ REST API WordPress publik Sakuranovel, jadi tidak perlu browser headless.
 - Proxy gambar untuk mengakali hotlink protection.
 - Novel Sakuranovel: daftar novel, detail, daftar chapter, chapter terbaru, pencarian,
   genre, dan statistik.
+- Novel acak dan chapter acak dengan `seed` opsional, jadi hasilnya bisa diulang
+  untuk pengujian atau fitur "buka yang mana saja".
 - Teks chapter novel lengkap dalam bentuk paragraf biasa (plus excerpt singkat).
 - Cache, rate limit sederhana, CORS, dan error handling.
 - API key, allowlist origin, dan URL gambar bertanda tangan (opsional, aktif lewat env).
@@ -124,8 +126,10 @@ tidak perlu menebak pola URL.
 | `GET /api/novels?q=academy` | Cari novel lewat query `q` |
 | `GET /api/novels/search?q=academy` | Pencarian novel |
 | `GET /api/novels/latest` | Chapter terbaru dari semua novel |
+| `GET /api/novels/random?seed=123` | Satu novel acak. `seed` opsional agar hasil bisa diulang |
 | `GET /api/novels/:idOrSlug` | Detail novel + chapter pertama/terbaru |
 | `GET /api/novels/:idOrSlug/chapters?page=1&limit=50&order=desc` | Daftar chapter |
+| `GET /api/novels/:idOrSlug/random-chapter?seed=123` | Satu chapter acak dari novel tertentu |
 | `GET /api/novels/chapters/:id` | Satu chapter + excerpt + teks lengkap (`paragraphs`) |
 | `GET /api/novels/chapters/:id?content=0` | Metadata + excerpt saja, tanpa teks lengkap |
 | `GET /api/novels/genres` | Tag/genre populer |
@@ -152,7 +156,12 @@ curl "http://localhost:3000/api/novels/the-victim-of-the-academy/chapters?limit=
 curl "http://localhost:3000/api/novels/chapters/421269"
 curl "http://localhost:3000/api/novels/chapters/421269?content=0"
 curl "http://localhost:3000/api/novels/latest?limit=10"
+curl "http://localhost:3000/api/novels/random?seed=42"
+curl "http://localhost:3000/api/novels/the-victim-of-the-academy/random-chapter?seed=42"
 ```
+
+`seed` membuat pilihan acak deterministik: request dengan seed yang sama akan
+mengembalikan halaman dan item yang sama selama data sumber belum berubah.
 
 Contoh response chapter novel:
 
