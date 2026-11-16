@@ -63,6 +63,7 @@ function docs() {
       'GET /api/novels/:idOrSlug/chapters',
       'GET /api/novels/:idOrSlug/random-chapter?seed=123',
       'GET /api/novels/chapters/:id?content=1',
+      'GET /api/novels/chapters/:id/neighbors',
       'GET /api/novels/genres',
       'GET /api/novels/stats',
       'GET /api/novels/source',

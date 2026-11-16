@@ -15,6 +15,7 @@ const {
   getNovelDetail,
   listChapters,
   getChapter,
+  getChapterNeighbors,
   getLatestChapters,
   searchNovels,
   listGenres,
@@ -255,6 +256,17 @@ router.get(
       {},
       { maxAge: 3600 },
     );
+  }),
+);
+
+/** GET /api/novels/chapters/:id/neighbors */
+router.get(
+  '/chapters/:id/neighbors',
+  asyncRoute(async (req, res) => {
+    const result = await getChapterNeighbors(req.params.id);
+    const { cached, ageMs, item } = result;
+
+    return sendData(res, item, cacheMeta(result), { maxAge: 60 });
   }),
 );
 

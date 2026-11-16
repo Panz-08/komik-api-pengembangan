@@ -52,6 +52,7 @@ test('normalizeChapter membatasi excerpt dan menandai konten tidak tersedia', ()
   assert.equal(chapter.title, 'Novel Chapter 1 – Mulai');
   assert.equal(chapter.chapterNumber, 1);
   assert.equal(chapter.contentAvailable, false);
+  assert.equal(chapter.endpoints.neighbors, '/api/novels/chapters/1/neighbors');
   assert.equal(chapter.series.url, 'https://sakuranovel.id/seri/novel/');
   assert.ok(chapter.excerpt.length <= 320);
   assert.ok(chapter.excerpt.endsWith('…'));

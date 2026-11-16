@@ -298,6 +298,12 @@ function normalizeChapter(post, series = null, { includeContent = false } = {}) 
     readAt: post?.link || null,
   };
 
+  if (chapter.id) {
+    chapter.endpoints = {
+      neighbors: `/api/novels/chapters/${chapter.id}/neighbors`,
+    };
+  }
+
   if (post?.excerpt?.rendered) {
     chapter.excerpt = truncateText(stripHtml(post.excerpt.rendered), EXCERPT_MAX_LENGTH);
   }
@@ -498,6 +504,50 @@ async function getChapter(id, { includeContent = true } = {}) {
     item: normalizeChapter(result.data, series, { includeContent }),
     cached: result.cached,
     ageMs: result.ageMs || 0,
+  };
+}
+
+async function getChapterNeighbors(id) {
+  const { item } = await getChapter(id, { includeContent: false });
+  const seriesId = item.series?.id;
+  if (!seriesId) throw notFound('Novel untuk chapter ini tidak ditemukan');
+  if (!item.publishedAt) throw notFound('Tanggal chapter tidak tersedia');
+
+  const seriesRef = {
+    id: seriesId,
+    slug: item.series?.slug || '',
+    name: item.series?.title || '',
+    link: item.series?.url || null,
+  };
+  const base = {
+    seri: seriesId,
+    per_page: 1,
+    orderby: 'date',
+    _fields: CHAPTER_LIST_FIELDS,
+    exclude: item.id,
+  };
+
+  // `before`/`after` memakai tanggal terbit, jadi chapter sebelumnya/berikutnya
+  // tetap ketemu walau nomor chapter tidak berurutan atau judulnya aneh.
+  const [prevResult, nextResult] = await Promise.allSettled([
+    request('posts', { ...base, before: item.publishedAt, order: 'desc' }, { ttl: 60 }),
+    request('posts', { ...base, after: item.publishedAt, order: 'asc' }, { ttl: 60 }),
+  ]);
+
+  const pick = (result) => {
+    if (result.status !== 'fulfilled') return null;
+    const post = Array.isArray(result.value.data) ? result.value.data[0] : null;
+    return post ? normalizeChapter(post, seriesRef) : null;
+  };
+
+  return {
+    item: {
+      chapter: item,
+      previous: pick(prevResult),
+      next: pick(nextResult),
+    },
+    cached: false,
+    ageMs: 0,
   };
 }
 
@@ -721,6 +771,7 @@ module.exports = {
   getNovelDetail,
   listChapters,
   getChapter,
+  getChapterNeighbors,
   getLatestChapters,
   searchNovels,
   listGenres,

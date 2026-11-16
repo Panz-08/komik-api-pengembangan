@@ -46,5 +46,8 @@ test('validasi endpoint novel tidak menyentuh sumber', async () => {
 
     const badChapter = await fetch(`${base}/api/novels/chapters/abc`);
     assert.equal(badChapter.status, 400);
+
+    const badNeighbors = await fetch(`${base}/api/novels/chapters/abc/neighbors`);
+    assert.equal(badNeighbors.status, 400);
   });
 });

@@ -132,6 +132,7 @@ tidak perlu menebak pola URL.
 | `GET /api/novels/:idOrSlug/random-chapter?seed=123` | Satu chapter acak dari novel tertentu |
 | `GET /api/novels/chapters/:id` | Satu chapter + excerpt + teks lengkap (`paragraphs`) |
 | `GET /api/novels/chapters/:id?content=0` | Metadata + excerpt saja, tanpa teks lengkap |
+| `GET /api/novels/chapters/:id/neighbors` | Chapter sebelumnya & berikutnya dalam novel yang sama |
 | `GET /api/novels/genres` | Tag/genre populer |
 | `GET /api/novels/stats` | Jumlah novel dan chapter |
 | `GET /api/novels/source` | Info sumber novel |
@@ -155,6 +156,7 @@ curl "http://localhost:3000/api/novels/the-victim-of-the-academy"
 curl "http://localhost:3000/api/novels/the-victim-of-the-academy/chapters?limit=10&order=desc"
 curl "http://localhost:3000/api/novels/chapters/421269"
 curl "http://localhost:3000/api/novels/chapters/421269?content=0"
+curl "http://localhost:3000/api/novels/chapters/421269/neighbors"
 curl "http://localhost:3000/api/novels/latest?limit=10"
 curl "http://localhost:3000/api/novels/random?seed=42"
 curl "http://localhost:3000/api/novels/the-victim-of-the-academy/random-chapter?seed=42"
